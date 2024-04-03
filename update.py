@@ -52,10 +52,10 @@ if os.path.exists(OUTPUT_FILE):
 num_added = len(set(new_marketable_appids) - set(old_marketable_appids))
 num_removed = len(set(old_marketable_appids) - set(new_marketable_appids))
 
-if (num_removed > 10000):
-    # Sometimes tens of thousands of apps will randomly disappear from ISteamApps/GetAppList
+if (num_removed > 1000):
+    # Sometimes thousands of apps will randomly disappear from ISteamApps/GetAppList
     # This rarely reflects an accurate state of the apps on Steam, and so these changes should be ignored
-    # The number missing can range from 20,000 to 60,000 for a list that should contain 190,000 apps
+    # The number missing can range from 3,000 to 60,000 for a list that should contain 190,000 apps
     sys.exit(f"::warning::Unusually large number of apps removed ({num_removed}), ignoring changes")
 
 if (num_added == 0 and num_removed == 0):
