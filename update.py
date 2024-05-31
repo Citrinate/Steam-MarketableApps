@@ -20,7 +20,7 @@ except requests.exceptions.HTTPError as err:
     sys.exit(f"::error::{err}")
 
 # Account for the very rare possibility of a marketable app which doesn't appear in GetAppList
-# To date, I only know of 1: The Vanishing of Ethan Carter VR (457880), a DLC which has it's own trading cards)
+# None currently exist, but historically I only know of 1: The Vanishing of Ethan Carter VR (457880), a DLC which has it's own trading cards (this game's cards became unmarketable on May 31, 2024 when the DLC was removed from sale on Steam)
 marketable_overrides = list()
 if os.path.exists(MARKETABLE_OVERRIDE_FILE):
     with open(MARKETABLE_OVERRIDE_FILE, "r") as infile:
