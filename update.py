@@ -52,10 +52,13 @@ if os.path.exists(OUTPUT_FILE):
 num_added = len(set(new_marketable_appids) - set(old_marketable_appids))
 num_removed = len(set(old_marketable_appids) - set(new_marketable_appids))
 
-if (num_removed > 1000):
+if (num_removed > 200):
     # Sometimes thousands of apps will randomly disappear from ISteamApps/GetAppList
     # This rarely reflects an accurate state of the apps on Steam, and so these changes should be ignored
-    # The number missing can range from 3,000 to 60,000 for a list that should contain 190,000 apps
+    # The number missing can range from ~38 to 60,000 for a list that should contain 190,000 apps
+    # As of May 29, 2024 it has become impossible to eliminate error just by checking the number of apps removed in the last hour, as the lower bound is now too low 
+    # https://github.com/Citrinate/Steam-MarketableApps/commit/12c81566389f81ad69a1fca865ad66bfe5193ad4 Added 36 apps, removed 38 apps (4 of the removed are marketable: 1196470,1266700,1310410,1282150)
+    # https://github.com/Citrinate/Steam-MarketableApps/commit/1af7a94b40f32d177699243034cabda636fd84a7 Added 56 apps, removed 6 apps (1 hour later, added back most of the 38 that were removed an hour earlier)
     print(f"::notice::Unusually large number of apps removed ({num_removed}), ignoring changes")
     sys.exit(0)
 
