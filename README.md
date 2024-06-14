@@ -6,6 +6,9 @@ This is used to determine if a game's trading cards are marketable or not.  If t
 
 This list automatically updates every hour.
 
+> [!NOTE]
+> It will take ~4 hours before unmarketable AppIDs are removed from this list
+
 ### Links
 
 [marketable_apps.json](https://github.com/Citrinate/Steam-MarketableApps/raw/main/data/marketable_apps.json)

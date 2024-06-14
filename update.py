@@ -12,6 +12,7 @@ OUTPUT_FILE = Path(__file__).parent / "./data/marketable_apps.json"
 OUTPUT_FILE_MIN = Path(__file__).parent / "./data/marketable_apps.min.json"
 MARKETABLE_OVERRIDE_FILE = Path(__file__).parent / "./overrides/marketable_app_overrides.json"
 UNMARKETABLE_OVERRIDE_FILE = Path(__file__).parent / "./overrides/unmarketable_app_overrides.json"
+REMOVED_APPS_HISTORY = Path(__file__).parent / "./removed_apps_history.json" # Records the number of runs it's been since we last saw a removed app
 
 try:
     response = requests.get(API_URL)
@@ -49,17 +50,45 @@ if os.path.exists(OUTPUT_FILE):
     with open(OUTPUT_FILE, "r") as infile:
         old_marketable_appids = json.load(infile)
 
+removed = set(old_marketable_appids) - set(new_marketable_appids)
+num_removed = len(removed)
 num_added = len(set(new_marketable_appids) - set(old_marketable_appids))
-num_removed = len(set(old_marketable_appids) - set(new_marketable_appids))
 
-if (num_removed > 200):
-    # Sometimes thousands of apps will randomly disappear from ISteamApps/GetAppList
-    # This rarely reflects an accurate state of the apps on Steam, and so these changes should be ignored
-    # The number missing can range from ~38 to 60,000 for a list that should contain 190,000 apps
-    # As of May 29, 2024 it has become impossible to eliminate error just by checking the number of apps removed in the last hour, as the lower bound is now too low 
-    # https://github.com/Citrinate/Steam-MarketableApps/commit/12c81566389f81ad69a1fca865ad66bfe5193ad4 Added 36 apps, removed 38 apps (4 of the removed are marketable: 1196470,1266700,1310410,1282150)
-    # https://github.com/Citrinate/Steam-MarketableApps/commit/1af7a94b40f32d177699243034cabda636fd84a7 Added 56 apps, removed 6 apps (1 hour later, added back most of the 38 that were removed an hour earlier)
-    sys.exit(f"::warning::Unusually large number of apps removed ({num_removed}), ignoring changes")
+# Sometimes apps will randomly disappear from ISteamApps/GetAppList only to re-appear an hour or so later
+# The amount of apps this may effect can be as low as ~30 and as high as ~60,000 for a list that should contain ~190,000 apps
+# To compensate, only consider an app removed if it hasn't appeared for 4 consecutive runs (which translates to 4 hours as this script is ran hourly)
+# Example:
+# https://github.com/Citrinate/Steam-MarketableApps/commit/12c81566389f81ad69a1fca865ad66bfe5193ad4 Added 36 apps, removed 38 apps (4 of the removed were marketable: 1196470,1266700,1310410,1282150)
+# https://github.com/Citrinate/Steam-MarketableApps/commit/1af7a94b40f32d177699243034cabda636fd84a7 Added 56 apps, removed 6 apps (1 hour later, added back most of the 38 that were removed an hour earlier)
+if (num_removed > 0):
+    with open(REMOVED_APPS_HISTORY, "r+") as historyfile:
+        removed_history = json.load(historyfile)
+        for appid in removed_history.copy():
+            if int(appid) not in removed:
+                removed_history.pop(appid)
+
+        for appid in removed.copy():
+            remove = False
+            if str(appid) not in removed_history:
+                removed_history[str(appid)] = 1
+            elif removed_history[str(appid)] >= 3:
+                remove = True
+            else:
+                removed_history[str(appid)] += 1
+            
+            if remove == False:
+                removed.remove(appid)
+                new_marketable_appids.append(appid)
+
+        historyfile.seek(0)
+        json.dump(removed_history, historyfile)
+        historyfile.truncate()
+
+    if (num_removed != len(removed)):
+        num_removed_ignored = num_removed - len(removed)
+        num_removed = len(removed)
+        new_marketable_appids.sort()
+        print(f"::notice::Ignoring the removal of {num_removed_ignored} apps")
 
 if (num_added == 0 and num_removed == 0):
     print("::notice::No changes detected")
