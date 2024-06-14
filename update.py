@@ -12,7 +12,7 @@ OUTPUT_FILE = Path(__file__).parent / "./data/marketable_apps.json"
 OUTPUT_FILE_MIN = Path(__file__).parent / "./data/marketable_apps.min.json"
 MARKETABLE_OVERRIDE_FILE = Path(__file__).parent / "./overrides/marketable_app_overrides.json"
 UNMARKETABLE_OVERRIDE_FILE = Path(__file__).parent / "./overrides/unmarketable_app_overrides.json"
-REMOVED_APPS_HISTORY = Path(__file__).parent / "./removed_apps_history.json" # Records the number of runs it's been since we last saw a removed app
+REMOVED_APPS_HISTORY = Path(__file__).parent / "./data/removed_apps_history.json" # Records the number of runs it's been since we last saw a removed app
 
 try:
     response = requests.get(API_URL)
