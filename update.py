@@ -79,9 +79,11 @@ if (num_removed > 0):
             if remove == False:
                 removed.remove(appid)
                 new_marketable_appids.append(appid)
+            else:
+                removed_history.pop(str(appid))
 
         historyfile.seek(0)
-        json.dump(removed_history, historyfile)
+        json.dump(removed_history, historyfile, indent = 4)
         historyfile.truncate()
 
     if (num_removed != len(removed)):
