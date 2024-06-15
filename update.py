@@ -105,17 +105,16 @@ if (num_removed != len(removed)):
     new_marketable_appids.sort()
     print(f"::notice::Ignoring the removal of {num_removed_ignored} apps")
 
+commit_message = f'Added {num_added} apps, removed {num_removed} apps'
 if (num_added == 0 and num_removed == 0):
     print("::notice::No changes detected")
-    sys.exit(0)
-
-with open(OUTPUT_FILE, "w") as outfile, open(OUTPUT_FILE_MIN, "w") as outfile_min:
-    json.dump(new_marketable_appids, outfile_min)
-    json.dump(new_marketable_appids, outfile, indent = 4)
+else:
+    print(f"::notice::{commit_message}")
+    with open(OUTPUT_FILE, "w") as outfile, open(OUTPUT_FILE_MIN, "w") as outfile_min:
+        json.dump(new_marketable_appids, outfile_min)
+        json.dump(new_marketable_appids, outfile, indent = 4)
 
 # https://github.com/orgs/community/discussions/28146#discussioncomment-4110404
-commit_message = f'Added {num_added} apps, removed {num_removed} apps'
-print(f"::notice::{commit_message}")
 if "GITHUB_OUTPUT" in os.environ:
     with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
         print(f'COMMIT_MESSAGE={commit_message}', file=fh)
