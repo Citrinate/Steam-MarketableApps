@@ -7,7 +7,7 @@ This is used to determine if a game's trading cards are marketable or not.  If t
 This list automatically updates every hour.
 
 > [!NOTE]
-> It will take ~4 hours before unmarketable AppIDs are removed from this list
+> It will take ~4 hours from the time when a game's cards become unmarketable until its AppID is removed from the list.
 
 ### Links
 
