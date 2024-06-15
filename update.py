@@ -1,3 +1,4 @@
+from functools import cmp_to_key
 import json
 import os.path
 from pathlib import Path
@@ -60,37 +61,49 @@ num_added = len(set(new_marketable_appids) - set(old_marketable_appids))
 # Example:
 # https://github.com/Citrinate/Steam-MarketableApps/commit/12c81566389f81ad69a1fca865ad66bfe5193ad4 Added 36 apps, removed 38 apps (4 of the removed were marketable: 1196470,1266700,1310410,1282150)
 # https://github.com/Citrinate/Steam-MarketableApps/commit/1af7a94b40f32d177699243034cabda636fd84a7 Added 56 apps, removed 6 apps (1 hour later, added back most of the 38 that were removed an hour earlier)
-if (num_removed > 0):
-    with open(REMOVED_APPS_HISTORY, "r+") as historyfile:
-        removed_history = json.load(historyfile)
-        for appid in removed_history.copy():
-            if int(appid) not in removed:
-                removed_history.pop(appid)
+with open(REMOVED_APPS_HISTORY, "r+") as historyfile:
+    removed_history = json.load(historyfile)
+    for appid in removed_history.copy():
+        if int(appid) not in removed:
+            removed_history.pop(appid)
 
-        for appid in removed.copy():
-            remove = False
-            if str(appid) not in removed_history:
-                removed_history[str(appid)] = 1
-            elif removed_history[str(appid)] >= 3:
-                remove = True
+    for appid in removed.copy():
+        remove = False
+        if str(appid) not in removed_history:
+            removed_history[str(appid)] = 1
+        elif removed_history[str(appid)] >= 3:
+            remove = True
+        else:
+            removed_history[str(appid)] += 1
+        
+        if remove == False:
+            removed.remove(appid)
+            new_marketable_appids.append(appid)
+        else:
+            removed_history.pop(str(appid))
+
+    def history_cmp(a, b):
+        if (a[1] > b[1]):
+            return -1
+        elif (a[1] < b[1]):
+            return 1
+        else:
+            if (int(a[0]) > int(b[0])):
+                return 1
+            elif (int(a[0]) < int(b[0])):
+                return -1
             else:
-                removed_history[str(appid)] += 1
-            
-            if remove == False:
-                removed.remove(appid)
-                new_marketable_appids.append(appid)
-            else:
-                removed_history.pop(str(appid))
+                return 0
 
-        historyfile.seek(0)
-        json.dump(removed_history, historyfile, indent = 4)
-        historyfile.truncate()
+    historyfile.seek(0)
+    json.dump({k: v for k, v in sorted(removed_history.items(), key = cmp_to_key(history_cmp))}, historyfile, indent = 4)
+    historyfile.truncate()
 
-    if (num_removed != len(removed)):
-        num_removed_ignored = num_removed - len(removed)
-        num_removed = len(removed)
-        new_marketable_appids.sort()
-        print(f"::notice::Ignoring the removal of {num_removed_ignored} apps")
+if (num_removed != len(removed)):
+    num_removed_ignored = num_removed - len(removed)
+    num_removed = len(removed)
+    new_marketable_appids.sort()
+    print(f"::notice::Ignoring the removal of {num_removed_ignored} apps")
 
 if (num_added == 0 and num_removed == 0):
     print("::notice::No changes detected")
