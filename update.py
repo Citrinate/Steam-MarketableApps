@@ -82,6 +82,10 @@ with open(REMOVED_APPS_HISTORY, "r+") as historyfile:
         else:
             removed_history.pop(str(appid))
 
+    # It's still possible for the above to let bad data slip through. This check only minimizes the amount of bad data that gets through
+    if (len(removed) > 1000):
+        sys.exit(f"::warning::Unusually large number of apps removed ({len(removed)}), ignoring changes")
+
     def history_cmp(a, b):
         if (a[1] > b[1]):
             return -1
