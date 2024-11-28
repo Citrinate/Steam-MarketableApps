@@ -57,7 +57,7 @@ num_added = len(set(new_marketable_appids) - set(old_marketable_appids))
 
 # Sometimes apps will randomly disappear from ISteamApps/GetAppList only to re-appear an hour or so later
 # The amount of apps this may effect can be as low as ~30 and as high as ~60,000 for a list that should contain ~190,000 apps
-# To compensate, only consider an app removed if it hasn't appeared for 4 consecutive runs (which translates to 4 hours as this script is ran hourly)
+# To compensate, only consider an app removed if it hasn't appeared for 8 consecutive runs (which translates to 8 hours as this script is ran hourly)
 # Example:
 # https://github.com/Citrinate/Steam-MarketableApps/commit/12c81566389f81ad69a1fca865ad66bfe5193ad4 Added 36 apps, removed 38 apps (4 of the removed were marketable: 1196470,1266700,1310410,1282150)
 # https://github.com/Citrinate/Steam-MarketableApps/commit/1af7a94b40f32d177699243034cabda636fd84a7 Added 56 apps, removed 6 apps (1 hour later, added back most of the 38 that were removed an hour earlier)
@@ -71,7 +71,7 @@ with open(REMOVED_APPS_HISTORY, "r+") as historyfile:
         remove = False
         if str(appid) not in removed_history:
             removed_history[str(appid)] = 1
-        elif removed_history[str(appid)] >= 3:
+        elif removed_history[str(appid)] >= 7:
             remove = True
         else:
             removed_history[str(appid)] += 1
