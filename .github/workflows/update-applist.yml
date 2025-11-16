@@ -30,6 +30,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Execute update script
+        env: 
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
         id: update_script
         run: |
           python update.py

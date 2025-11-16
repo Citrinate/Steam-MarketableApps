@@ -1,120 +1,68 @@
-from functools import cmp_to_key
 import json
 import os.path
 from pathlib import Path
 import requests
 import sys
 
-# This script basically just caches the results of ISteamApps/GetAppList
-# It also accounts for certain issues I've encountered when trying to use this API directly
+# https://steamapi.xpaw.me/#IStoreService/GetAppList
+API_URL = (
+    "https://api.steampowered.com/IStoreService/GetApplist/v1"
+    "?max_results=50000"
+    "&include_games=true"
+    "&include_dlc=true"
+    "&include_software=true"
+    "&include_videos=true"
+    "&include_hardware=true"
+)
 
-API_URL = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
 OUTPUT_FILE = Path(__file__).parent / "./data/marketable_apps.json"
 OUTPUT_FILE_MIN = Path(__file__).parent / "./data/marketable_apps.min.json"
 MARKETABLE_OVERRIDE_FILE = Path(__file__).parent / "./overrides/marketable_app_overrides.json"
 UNMARKETABLE_OVERRIDE_FILE = Path(__file__).parent / "./overrides/unmarketable_app_overrides.json"
-REMOVED_APPS_HISTORY = Path(__file__).parent / "./data/removed_apps_history.json" # Records the number of runs it's been since we last saw a removed app
 
+def load_json_if_exists(path, default):
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return default
+
+# Get list of marketable appIDs from GetApplist
+new_marketable_appids = set()
 try:
-    response = requests.get(API_URL)
-    response.raise_for_status()
+    have_more_results = True
+    last_appid = 0
+    while have_more_results:
+        response = requests.get(API_URL, params={"key": os.getenv("STEAM_API_KEY"), "last_appid": last_appid})
+        response.raise_for_status()
+        try:
+            new_marketable_appids |= set(map(lambda x: x["appid"], response.json()["response"]["apps"]))
+            have_more_results = response.json()["response"].get("have_more_results", False)
+            last_appid = response.json()["response"].get("last_appid", 0)
+        except KeyError as e:
+            sys.exit(f"::error::JSON key {e} not found")
+        except json.JSONDecodeError:
+            sys.exit(f"::error::Invalid JSON returned from API at {last_appid}")
 except requests.exceptions.HTTPError as err:
     sys.exit(f"::error::{err}")
 
-# Account for the very rare possibility of a marketable app which doesn't appear in GetAppList
-# None currently exist, but historically I only know of 1: The Vanishing of Ethan Carter VR (457880), a DLC which has it's own trading cards (this game's cards became unmarketable on May 31, 2024 when the DLC was removed from sale on Steam)
-marketable_overrides = list()
-if os.path.exists(MARKETABLE_OVERRIDE_FILE):
-    with open(MARKETABLE_OVERRIDE_FILE, "r") as infile:
-        marketable_overrides = json.load(infile)
+# Add known marketable appIDs that are missing from GetAppList
+new_marketable_appids |= set(load_json_if_exists(MARKETABLE_OVERRIDE_FILE, []))
 
-# Account for the even rarer possibility of an unmarketable app which does appears in GetAppList
-# None exist to my knowledge, but maybe this will happen in the future
-unmarketable_overrides = list()
-if os.path.exists(UNMARKETABLE_OVERRIDE_FILE):
-    with open(UNMARKETABLE_OVERRIDE_FILE, "r") as infile:
-        unmarketable_overrides = json.load(infile)
+# Remove known unmarketable appIDs that appear in GetAppList
+new_marketable_appids -= set(load_json_if_exists(UNMARKETABLE_OVERRIDE_FILE, []))
 
-try:
-    new_marketable_appids = set(map(lambda x: x["appid"], response.json()["applist"]["apps"]))
-    new_marketable_appids |= set(marketable_overrides)
-    new_marketable_appids -= set(unmarketable_overrides)
-    new_marketable_appids = list(new_marketable_appids)
-    new_marketable_appids.sort()
-except KeyError as e:
-    sys.exit(f"::error::JSON key {e} not found")
-except json.JSONDecodeError:
-    sys.exit(f"::error::Invalid JSON returned from {API_URL}")
-
-old_marketable_appids = list()
-if os.path.exists(OUTPUT_FILE):
-    with open(OUTPUT_FILE, "r") as infile:
-        old_marketable_appids = json.load(infile)
-
-removed = set(old_marketable_appids) - set(new_marketable_appids)
-num_removed = len(removed)
-num_added = len(set(new_marketable_appids) - set(old_marketable_appids))
-
-# Sometimes apps will randomly disappear from ISteamApps/GetAppList only to re-appear an hour or so later
-# The amount of apps this may effect can be as low as ~30 and as high as ~60,000 for a list that should contain ~190,000 apps
-# To compensate, only consider an app removed if it hasn't appeared for 24 consecutive runs (which translates to 24 hours as this script is ran hourly)
-# Example:
-# https://github.com/Citrinate/Steam-MarketableApps/commit/12c81566389f81ad69a1fca865ad66bfe5193ad4 Added 36 apps, removed 38 apps (4 of the removed were marketable: 1196470,1266700,1310410,1282150)
-# https://github.com/Citrinate/Steam-MarketableApps/commit/1af7a94b40f32d177699243034cabda636fd84a7 Added 56 apps, removed 6 apps (1 hour later, added back most of the 38 that were removed an hour earlier)
-with open(REMOVED_APPS_HISTORY, "r+") as historyfile:
-    removed_history = json.load(historyfile)
-    for appid in removed_history.copy():
-        if int(appid) not in removed:
-            removed_history.pop(appid)
-
-    for appid in removed.copy():
-        remove = False
-        if str(appid) not in removed_history:
-            removed_history[str(appid)] = 1
-        elif removed_history[str(appid)] >= 23:
-            remove = True
-        else:
-            removed_history[str(appid)] += 1
-        
-        if remove == False:
-            removed.remove(appid)
-            new_marketable_appids.append(appid)
-        else:
-            removed_history.pop(str(appid))
-
-    # It's still possible for the above to let bad data slip through. This check only minimizes the amount of bad data that gets through
-    if (len(removed) > 1000):
-        sys.exit(f"::warning::Unusually large number of apps removed ({len(removed)}), ignoring changes")
-
-    def history_cmp(a, b):
-        if (a[1] > b[1]):
-            return -1
-        elif (a[1] < b[1]):
-            return 1
-        else:
-            if (int(a[0]) > int(b[0])):
-                return 1
-            elif (int(a[0]) < int(b[0])):
-                return -1
-            else:
-                return 0
-
-    historyfile.seek(0)
-    json.dump({k: v for k, v in sorted(removed_history.items(), key = cmp_to_key(history_cmp))}, historyfile, indent = 4)
-    historyfile.truncate()
-
-if (num_removed != len(removed)):
-    num_removed_ignored = num_removed - len(removed)
-    num_removed = len(removed)
-    new_marketable_appids.sort()
-    print(f"::notice::Ignoring the removal of {num_removed_ignored} apps")
-
+# Save updated list
+old_marketable_appids = set(load_json_if_exists(OUTPUT_FILE, []))
+num_removed = len(old_marketable_appids - new_marketable_appids)
+num_added = len(new_marketable_appids - old_marketable_appids)
 commit_message = f'Added {num_added} apps, removed {num_removed} apps'
+
 if (num_added == 0 and num_removed == 0):
     print("::notice::No changes detected")
 else:
     print(f"::notice::{commit_message}")
     with open(OUTPUT_FILE, "w") as outfile, open(OUTPUT_FILE_MIN, "w") as outfile_min:
+        new_marketable_appids = sorted(new_marketable_appids)
         json.dump(new_marketable_appids, outfile_min)
         json.dump(new_marketable_appids, outfile, indent = 4)
 
